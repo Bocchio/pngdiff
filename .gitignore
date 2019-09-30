@@ -7,3 +7,12 @@ cmake_install.cmake
 install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
+prefix.sh
+
+*.so
+
+ecm_uninstall.cmake
+
+build
+__pycache__
+tests

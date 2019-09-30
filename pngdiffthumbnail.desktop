@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Service
+Name=PNGDIF images
+X-KDE-ServiceTypes=ThumbCreator
+MimeType=image/x-pngdif;
+CacheThumbnail=true
+X-KDE-Library=pngdif_thumbcreator
