@@ -7,21 +7,29 @@
 #include <QColor>
 
 /* because I don't want to write static constexpr char * IEND = (char *) "IEND"
- * each time there's a valid chunk_type */
-#define PNG_LABEL(label) static constexpr char * label = (char *) #label
+ * each time there's a valid chunk_type
+ * so we use three macros:
+ *      the arguments of a generic chunk reader
+ *      a way to include labels and the functions associated with them
+ *      and a way to put the reader and the label into a dictionary */
+#define PNG_READER_ARGS uint32_t, QByteArray &
+#define PNG_LABEL(label) static constexpr char * label = (char *) #label; \
+    bool label ## Reader(PNG_READER_ARGS);
+#define PNG_INSERT_LABEL(label) \
+    map.insert(QByteArray(PNG::label), &PNG::label ## Reader)
 
 uint8_t paeth_predictor(uint8_t a, uint8_t b, uint8_t c);
 
 class PNG
 {
-    typedef bool (PNG::*chunk_reader)(uint16_t length, QByteArray data);
+    typedef bool (PNG::*chunk_reader)(PNG_READER_ARGS);
 
     public:
-        PNG_LABEL(IHDR);
-        PNG_LABEL(sRGB);
-        PNG_LABEL(sBIT);
-        PNG_LABEL(IDAT);
-        PNG_LABEL(IEND);
+        PNG_LABEL(IHDR)
+        PNG_LABEL(sRGB)
+        PNG_LABEL(sBIT)
+        PNG_LABEL(IDAT)
+        PNG_LABEL(IEND)
 
         QMap<QByteArray, chunk_reader> chunkmap;
         uint32_t width;
@@ -40,16 +48,13 @@ class PNG
 
         bool process(QByteArray file_data);
 
+
         QByteArray reconstruct_png(QByteArray &original);
 
         bool change_byte(uint16_t scanline, uint32_t pos, uint8_t byte);
+        bool change_bytes(uint16_t scanline, QByteArray differences);
 
         QColor getPixel(int x, int y);
-
-        bool ihdrReader(uint16_t length, QByteArray data);
-        bool srgbReader(uint16_t length, QByteArray data);
-        bool sbitReader(uint16_t length, QByteArray data);
-        bool idatReader(uint16_t length, QByteArray data);
 };
 
 

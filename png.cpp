@@ -28,10 +28,10 @@ PNG::PNG() {
 QMap<QByteArray, PNG::chunk_reader>
 PNG::initChunkMap() {
     QMap<QByteArray, PNG::chunk_reader> map;
-    map.insert(QByteArray("IHDR"), &PNG::ihdrReader);
-    map.insert(QByteArray("sRGB"), &PNG::srgbReader);
-    map.insert(QByteArray("sBIT"), &PNG::sbitReader);
-    map.insert(QByteArray("IDAT"), &PNG::idatReader);
+    PNG_INSERT_LABEL(IHDR);
+    PNG_INSERT_LABEL(sRGB);
+    PNG_INSERT_LABEL(sBIT);
+    PNG_INSERT_LABEL(IDAT);
     return map;
 }
 
@@ -134,6 +134,18 @@ PNG::reconstruct_png(QByteArray &original) {
     return reconstructed;
 }
 
+
+bool
+PNG::change_bytes(uint16_t scanline, QByteArray differences) {
+    int scanline_offset = width*4*scanline;
+    for (int j = 0; j < differences.size(); j += 3) {
+        uint32_t pos = qFromBigEndian<quint16>(differences.mid(j, 2).data());
+        image_data[scanline_offset + pos] = differences[j+2];
+    }
+
+    return true;
+}
+
 bool
 PNG::change_byte(uint16_t scanline, uint32_t pos, uint8_t byte) {
     int scanlines_size = width*4;
@@ -154,7 +166,7 @@ PNG::getPixel(int x, int y) {
 }
 
 bool
-PNG::ihdrReader(uint16_t length, QByteArray data) {
+PNG::IHDRReader(uint32_t length, QByteArray &data) {
     Q_UNUSED(length);
 
     width = qFromBigEndian<quint32>(data.mid(0, 4).data());
@@ -181,7 +193,7 @@ PNG::ihdrReader(uint16_t length, QByteArray data) {
 }
 
 bool
-PNG::srgbReader(uint16_t length, QByteArray data) {
+PNG::sRGBReader(uint32_t length, QByteArray &data) {
     Q_UNUSED(length);
     Q_UNUSED(data);
 
@@ -189,7 +201,7 @@ PNG::srgbReader(uint16_t length, QByteArray data) {
 }
 
 bool
-PNG::sbitReader(uint16_t length, QByteArray data) {
+PNG::sBITReader(uint32_t length, QByteArray &data) {
     Q_UNUSED(length);
     Q_UNUSED(data);
 
@@ -197,7 +209,7 @@ PNG::sbitReader(uint16_t length, QByteArray data) {
 }
 
 bool
-PNG::idatReader(uint16_t length, QByteArray data) {
+PNG::IDATReader(uint32_t length, QByteArray &data) {
     Q_UNUSED(length);
 
     image_data += data;

@@ -4,7 +4,7 @@ PNG DIFF file format
 */
 
 #include "pngdiff.h"
-#include "png.h"
+#include "crc_utils.h"
 
 #include <iostream>
 
@@ -18,47 +18,122 @@ PNG DIFF file format
 #include <QMap>
 
 
+QMap<QByteArray, PNGDIFF::chunk_reader>
+PNGDIFF::initChunkMap() {
+    QMap<QByteArray, PNGDIFF::chunk_reader> map;
+    PNGDIFF_INSERT_LABEL(path);
+    PNGDIFF_INSERT_LABEL(itra);
+    PNGDIFF_INSERT_LABEL(styp);
+    PNGDIFF_INSERT_LABEL(idat);
+    return map;
+}
+
+bool PNGDIFF::pathReader(uint32_t length, QByteArray &data)
+{
+    Q_UNUSED(length);
+
+    QFile original_file(data);
+    original_file.open(QIODevice::ReadOnly);
+    original_image_data = original_file.readAll();
+    original_file.close();
+    original_image.process(original_image_data);
+
+    return true;
+}
+
+bool PNGDIFF::itraReader(uint32_t length, QByteArray &data)
+{
+    Q_UNUSED(length); Q_UNUSED(data);
+    return true;
+}
+
+bool PNGDIFF::stypReader(uint32_t length, QByteArray &data)
+{
+    data = QByteArray((const char *) &length, 4) + data;
+    scanline_compression_types = qUncompress(data);
+
+    if (scanline_compression_types.size() != original_image.height)
+        qDebug() << "heights differ";
+
+    return true;
+}
+
+bool PNGDIFF::idatReader(uint32_t length, QByteArray &data)
+{
+    data = QByteArray((const char *) &length, 4) + data;
+    data = qUncompress(data);
+
+    uint index = 0;
+
+    for (uint i = 0; i < original_image.height; i++) {
+        uint8_t compression_type = scanline_compression_types[i];
+        if (compression_type == PNGDIFF_COMPRESSION_TYPE_REPLACE_INDIVIDUAL) {
+            uint16_t scanline = qFromBigEndian<quint16>(data.mid(index, 2).data());
+            index += 2;
+            uint32_t length = qFromBigEndian<quint32>(data.mid(index, 4).data());
+            index += 4;
+            QByteArray differences = data.mid(index, length);
+            index += length;
+        }
+    }
+
+    return true;
+}
+
+bool PNGDIFF::process(QByteArray data)
+{
+    uint index = PNGDIFF_SIGNATURE_SIZE;
+    QByteArray signature = data.left(PNGDIFF_SIGNATURE_SIZE);
+
+    while (true) {
+        uint32_t length = qFromBigEndian<quint32>(data.mid(index, 4).data());
+        index += 4;
+        QByteArray chunk_type = data.mid(index, 4);
+        index += 4;
+
+        QByteArray chunk_data = data.mid(index, length);
+        index += length;
+        uint32_t crc = qFromBigEndian<quint32>(data.mid(index, 4).data());
+        index += 4;
+
+        if (chunk_type == IEND)
+            break;
+
+        if (crc != crc32(chunk_type + chunk_data)) {
+            qDebug() << chunk_type;
+            qDebug() << "CRC failed" << crc << crc32(data, crc32(data));
+            return false;
+        }
+
+        if (!chunkmap.contains(chunk_type)) {
+            qDebug() << chunk_type;
+            return false;
+        }
+
+        PNGDIFF::chunk_reader reader = chunkmap[chunk_type];
+        if(!(this->*reader)(length, chunk_data)){
+            qDebug() << chunk_type;
+            qDebug() << "error reading chunk";
+        }
+    }
+
+    return false;
+}
+
 PNGDIFFHandler::PNGDIFFHandler()
 {
 }
 
 bool PNGDIFFHandler::read(QImage *outImage)
 {
-    QByteArray signature = device()->read(PNGDIFF_SIGNATURE_SIZE);
-    uint16_t path_length = qFromBigEndian<quint16>(device()->read(2).data());
-    QByteArray path = device()->read(path_length);
-    QFile archivo_referenciado(path);
+    PNGDIFF pngdiff;
+    pngdiff.process(device()->readAll());
 
-    archivo_referenciado.open(QIODevice::ReadOnly);
-    QByteArray image_data = archivo_referenciado.readAll();
-    archivo_referenciado.close();
-
-    PNG imagen_leida;
-    imagen_leida.process(image_data);
-
-    QByteArray diff_data = device()->readAll();
-    diff_data = qUncompress(diff_data);
-
-    uint index = 0;
-
-    for (uint i = 0; i < imagen_leida.height; i++) {
-        uint16_t scanline = qFromBigEndian<quint16>(diff_data.mid(index, 2).data());
-        index += 2;
-        uint32_t length = qFromBigEndian<quint32>(diff_data.mid(index, 4).data());
-        index += 4;
-        QByteArray differences = diff_data.mid(index, length);
-        index += length;
-
-        for (int j = 0; j < differences.size(); j += 3) {
-            uint32_t pos = qFromBigEndian<quint16>(differences.mid(j, 2).data());
-            uint8_t val = differences[j+2];
-            imagen_leida.change_byte(scanline, pos, val);
-        }
-    }
+    return false;
 
     try {
-        int width = imagen_leida.width;
-        int height = imagen_leida.height;
+        int width = pngdiff.original_image.width;
+        int height = pngdiff.original_image.height;
 
         QImage image(width, height, QImage::Format_ARGB32);
         if (image.isNull()) {
@@ -67,7 +142,7 @@ bool PNGDIFFHandler::read(QImage *outImage)
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                image.setPixelColor(x, y, imagen_leida.getPixel(x, y));
+                image.setPixelColor(x, y, pngdiff.original_image.getPixel(x, y));
             }
         }
 
