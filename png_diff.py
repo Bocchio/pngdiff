@@ -22,18 +22,36 @@ with open(args.origin, 'rb') as f:
 with open(args.compressible, 'rb') as f:
     compressible.process(f)
 
+print('Finished reading')
+
 differences = compressible.difference(origin)
+
+print('Finished calculating differences')
+
+
+def write_chunk(f, chunk_type, data, compress=False):
+    if compress:
+        data = zlib.compress(data)
+
+    length = len(data)
+    f.write(length.to_bytes(length=4, byteorder='big'))
+    f.write(chunk_type)
+    f.write(data)
+    crc = zlib.crc32(chunk_type + data)
+    f.write(crc.to_bytes(length=4, byteorder='big'))
+
 
 with open(args.compressible + 'diff', 'wb') as f:
     f.write(b'pngdiff')
     path = os.path.join(os.getcwd(), args.origin)
     path = path.encode()
-    length = len(path)
-    f.write(length.to_bytes(length=2, byteorder='big'))
-    f.write(path)
+    write_chunk(f, b'path', path)
+
+    compression_types = bytearray()
 
     difference_data = bytearray()
     for s, scanline in enumerate(differences):
+        compression_types += b'\x00'
         s = s.to_bytes(length=2, byteorder='big')
         length = len(scanline)*3
         length = length.to_bytes(length=4, byteorder='big')
@@ -43,7 +61,6 @@ with open(args.compressible + 'diff', 'wb') as f:
             difference_data += pos
             difference_data += val
 
-    difference_data = zlib.compress(difference_data)
-    length = len(difference_data).to_bytes(length=4, byteorder='big')
-    f.write(length)
-    f.write(difference_data)
+    write_chunk(f, b'styp', compression_types, compress=True)
+    write_chunk(f, b'idat', difference_data, compress=True)
+    write_chunk(f, b'IEND', b'')

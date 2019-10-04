@@ -18,6 +18,10 @@ PNG DIFF file format
 #include <QMap>
 
 
+PNGDIFF::PNGDIFF() {
+    chunkmap = initChunkMap();
+}
+
 QMap<QByteArray, PNGDIFF::chunk_reader>
 PNGDIFF::initChunkMap() {
     QMap<QByteArray, PNGDIFF::chunk_reader> map;
@@ -74,6 +78,7 @@ bool PNGDIFF::idatReader(uint32_t length, QByteArray &data)
             index += 4;
             QByteArray differences = data.mid(index, length);
             index += length;
+            original_image.change_bytes(scanline, differences);
         }
     }
 
@@ -99,6 +104,8 @@ bool PNGDIFF::process(QByteArray data)
         if (chunk_type == IEND)
             break;
 
+        qDebug() << chunk_type;
+
         if (crc != crc32(chunk_type + chunk_data)) {
             qDebug() << chunk_type;
             qDebug() << "CRC failed" << crc << crc32(data, crc32(data));
@@ -107,6 +114,7 @@ bool PNGDIFF::process(QByteArray data)
 
         if (!chunkmap.contains(chunk_type)) {
             qDebug() << chunk_type;
+            qDebug() << "Unrecognized chunk type";
             return false;
         }
 
@@ -128,8 +136,6 @@ bool PNGDIFFHandler::read(QImage *outImage)
 {
     PNGDIFF pngdiff;
     pngdiff.process(device()->readAll());
-
-    return false;
 
     try {
         int width = pngdiff.original_image.width;

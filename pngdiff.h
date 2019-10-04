@@ -62,7 +62,7 @@ class PNGDIFF
     PNG original_image;
     QByteArray scanline_compression_types;
 
-    PNGDIFF() {};
+    PNGDIFF();
     QMap<QByteArray, chunk_reader> initChunkMap();
 
     bool process(QByteArray data);

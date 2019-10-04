@@ -49,7 +49,9 @@ class PNG:
                 print("error reading chunk")
 
         self.image_data = zlib.decompress(self.image_data)
+        print('finished decompressing')
         self.reconstruct_png(self.image_data)
+        print('finished reconstructing')
 
         return True
 
