@@ -51,15 +51,16 @@ with open(args.compressible + 'diff', 'wb') as f:
 
     difference_data = bytearray()
     for s, scanline in enumerate(differences):
-        compression_types += b'\x00'
         s = s.to_bytes(length=2, byteorder='big')
         length = len(scanline)*3
-        length = length.to_bytes(length=4, byteorder='big')
         difference_data += s
-        difference_data += length
-        for pos, val in scanline:
-            difference_data += pos
-            difference_data += val
+        if length < origin.width*4:
+            compression_types += b'\x00'
+            length = length.to_bytes(length=4, byteorder='big')
+            difference_data += length
+            for pos, val in scanline:
+                difference_data += pos
+                difference_data += val
 
     write_chunk(f, b'styp', compression_types, compress=True)
     write_chunk(f, b'idat', difference_data, compress=True)
