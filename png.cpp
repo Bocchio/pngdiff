@@ -60,8 +60,8 @@ PNG::process(QByteArray file_data) {
         }
 
         if (!chunkmap.contains(chunk_type)) {
-            qDebug() << chunk_type;
-            return false;
+            qDebug() << "Unrecognized chunk" << chunk_type;
+            continue;
         }
 
         PNG::chunk_reader reader = chunkmap[chunk_type];
@@ -141,6 +141,16 @@ PNG::change_bytes(uint16_t scanline, QByteArray differences) {
     for (int j = 0; j < differences.size(); j += 3) {
         uint32_t pos = qFromBigEndian<quint16>(differences.mid(j, 2).data());
         image_data[scanline_offset + pos] = differences[j+2];
+    }
+
+    return true;
+}
+
+bool
+PNG::change_segment(uint16_t scanline, uint16_t pos, QByteArray differences) {
+    int scanline_offset = width*4*scanline;
+    for (int j = 0; j < differences.size(); j++) {
+        image_data[scanline_offset + pos] = differences[j];
     }
 
     return true;

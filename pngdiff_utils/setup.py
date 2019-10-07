@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="pngdiff_utils",
+    name="pngdiff",
     version="0.0.1",
     author="Bocchio",
     author_email="guido@bocch.io",
@@ -13,11 +13,12 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Bocchio/pngdiff",
     packages=setuptools.find_packages(),
-	#entry_points={
-	#	'console_scripts': [
-	#		'png_diff=png_diff:main',
-	#	],
-	#}
+	entry_points={
+		'console_scripts': [
+			'pngdiff=pngdiff:main',
+			'pyversion=pngdiff:pyversion'
+		],
+	},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

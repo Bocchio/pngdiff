@@ -17,7 +17,6 @@ PNG DIFF file format
 #include <QtEndian>
 #include <QMap>
 
-
 PNGDIFF::PNGDIFF() {
     chunkmap = initChunkMap();
 }
@@ -32,7 +31,7 @@ PNGDIFF::initChunkMap() {
     return map;
 }
 
-bool PNGDIFF::pathReader(uint32_t length, QByteArray &data)
+bool PNGDIFF::pathReader(uint32_t length, QByteArray data)
 {
     Q_UNUSED(length);
 
@@ -45,25 +44,30 @@ bool PNGDIFF::pathReader(uint32_t length, QByteArray &data)
     return true;
 }
 
-bool PNGDIFF::itraReader(uint32_t length, QByteArray &data)
+bool PNGDIFF::itraReader(uint32_t length, QByteArray data)
 {
     Q_UNUSED(length); Q_UNUSED(data);
     return true;
 }
 
-bool PNGDIFF::stypReader(uint32_t length, QByteArray &data)
+bool PNGDIFF::stypReader(uint32_t length, QByteArray data)
 {
+    length = qToBigEndian(length);
     data = QByteArray((const char *) &length, 4) + data;
     scanline_compression_types = qUncompress(data);
 
-    if (scanline_compression_types.size() != original_image.height)
+    if (scanline_compression_types.size() != original_image.height) {
+        qDebug() << scanline_compression_types.size();
+        qDebug() << original_image.height;
         qDebug() << "heights differ";
+    }
 
     return true;
 }
 
-bool PNGDIFF::idatReader(uint32_t length, QByteArray &data)
+bool PNGDIFF::idatReader(uint32_t length, QByteArray data)
 {
+    length = qToBigEndian(length);
     data = QByteArray((const char *) &length, 4) + data;
     data = qUncompress(data);
 
@@ -71,14 +75,36 @@ bool PNGDIFF::idatReader(uint32_t length, QByteArray &data)
 
     for (uint i = 0; i < original_image.height; i++) {
         uint8_t compression_type = scanline_compression_types[i];
-        if (compression_type == PNGDIFF_COMPRESSION_TYPE_REPLACE_INDIVIDUAL) {
-            uint16_t scanline = qFromBigEndian<quint16>(data.mid(index, 2).data());
-            index += 2;
+        if (compression_type == PNGDIFF_COMPRESSION_TYPE_IGNORE) {
+            continue;
+        } else if (compression_type == PNGDIFF_COMPRESSION_TYPE_SIMPLE) {
+            //uint16_t scanline = qFromBigEndian<quint16>(data.mid(index, 2).data());
+            //index += 2;
+            uint16_t scanline = i;
+
             uint32_t length = qFromBigEndian<quint32>(data.mid(index, 4).data());
             index += 4;
             QByteArray differences = data.mid(index, length);
             index += length;
             original_image.change_bytes(scanline, differences);
+        } else if (compression_type == PNGDIFF_COMPRESSION_TYPE_CONTINUED) {
+            //uint16_t scanline = qFromBigEndian<quint16>(data.mid(index, 2).data());
+            //index += 2;
+            uint16_t scanline = i;
+
+            uint32_t length = qFromBigEndian<quint32>(data.mid(index, 4).data());
+            index += 4;
+            QByteArray differences = data.mid(index, length);
+            index += length;
+            while (index < differences.size()) {
+                uint16_t pos = qFromBigEndian<quint16>(differences.mid(index, 2));
+                index += 2;
+                length = qFromBigEndian<quint8>(differences.mid(index, 1));
+                index += 1;
+                QByteArray segment_data = differences.mid(index, length);
+                index += length;
+                original_image.change_segment(scanline, pos, segment_data);
+            }
         }
     }
 

@@ -53,6 +53,8 @@ class PNG
 
         bool change_byte(uint16_t scanline, uint32_t pos, uint8_t byte);
         bool change_bytes(uint16_t scanline, QByteArray differences);
+        bool change_segment(uint16_t scanline, uint16_t pos, QByteArray differences);
+
 
         QColor getPixel(int x, int y);
 };

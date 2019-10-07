@@ -16,13 +16,15 @@
 #define PNGDIFF_FORMAT_KEY "pngdiff"
 
 // I want to reduce the refactoring as much as possible
-#define PNGDIFF_READER_ARGS uint32_t, QByteArray &
+#define PNGDIFF_READER_ARGS uint32_t, QByteArray
 #define PNGDIFF_LABEL(label) static constexpr char * label = (char *) #label; \
     bool label ## Reader(PNGDIFF_READER_ARGS);
 #define PNGDIFF_INSERT_LABEL(label) \
     map.insert(QByteArray(PNGDIFF::label), &PNGDIFF::label ## Reader)
 
-#define PNGDIFF_COMPRESSION_TYPE_REPLACE_INDIVIDUAL 0
+#define PNGDIFF_COMPRESSION_TYPE_IGNORE     0x00
+#define PNGDIFF_COMPRESSION_TYPE_SIMPLE     0x01
+#define PNGDIFF_COMPRESSION_TYPE_CONTINUED  0x02
 
 class PNGDIFFHandler : public QImageIOHandler
 {
