@@ -147,10 +147,10 @@ PNG::change_bytes(uint16_t scanline, QByteArray differences) {
 }
 
 bool
-PNG::change_segment(uint16_t scanline, uint16_t pos, QByteArray differences) {
+PNG::change_segment(uint scanline, uint pos, QByteArray differences) {
     int scanline_offset = width*4*scanline;
     for (int j = 0; j < differences.size(); j++) {
-        image_data[scanline_offset + pos] = differences[j];
+        image_data[scanline_offset + pos + j] = differences[j];
     }
 
     return true;

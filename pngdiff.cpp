@@ -96,13 +96,25 @@ bool PNGDIFF::idatReader(uint32_t length, QByteArray data)
             index += 4;
             QByteArray differences = data.mid(index, length);
             index += length;
-            while (index < differences.size()) {
-                uint16_t pos = qFromBigEndian<quint16>(differences.mid(index, 2));
-                index += 2;
-                length = qFromBigEndian<quint8>(differences.mid(index, 1));
-                index += 1;
-                QByteArray segment_data = differences.mid(index, length);
-                index += length;
+
+            uint diff_index = 0;
+            while (diff_index < differences.size()) {
+                uint pos = qFromBigEndian<quint16>(differences.mid(diff_index, 2));
+                diff_index += 2;
+                uint msb = 0x80;
+                uint low_bits = msb - 1;
+                uint buffer = differences.mid(diff_index, 1)[0];
+                diff_index += 1;
+                uint byte_length = 0;
+                length = buffer & low_bits;
+                while (buffer & msb) {
+                    buffer = differences.mid(diff_index, 1)[0];
+                    diff_index += 1;
+                    byte_length += 1;
+                    length += (buffer & low_bits) << byte_length*7;
+                }
+                QByteArray segment_data = differences.mid(diff_index, length);
+                diff_index += length;
                 original_image.change_segment(scanline, pos, segment_data);
             }
         }

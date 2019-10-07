@@ -32,6 +32,8 @@ class PNG:
     COMPRESSION_CONTINUED = b'\x02'
     COMPRESSION_REPLACE = b'\x03'
 
+    EXTENDED_FLAG = 0x80
+
     def process(self, file):
         signature = file.read(8);
 
@@ -122,6 +124,8 @@ class PNG:
         difference_data = bytearray()
         compression_types = bytearray()
 
+        cls = self.__class__
+
         for s in range(self.height):
             current_scanline = self.scanline(s)
             scanlines = zip(current_scanline, other.scanline(s))
@@ -134,7 +138,7 @@ class PNG:
             #if difference_size < self.scanline_size:
 
             if len(s_difference) == 0:
-                compression_type = self.__class__.COMPRESSION_IGNORE
+                compression_type = cls.COMPRESSION_IGNORE
                 compression_types += compression_type
                 continue
 
@@ -143,26 +147,51 @@ class PNG:
             continued_difference = bytearray()
             segment = bytearray()
             segment_length = 0
-            start = 0
+            start = s_difference[0][0]
+            last_pos = s_difference[-1][0]
             for pos, (b, dummy) in s_difference:
-                if (pos != start + segment_length) or (segment_length == 255) :
-                    continued_difference += struct.pack('>HB', start, segment_length) + segment
+
+                # it's cheaper to replace a byte in a segment than to create another
+                # segment altogether
+                if pos > (start + segment_length + 5) or pos == last_pos:
+
+                    # Extended coding it lets use the msb in each byte as a flag
+                    # that the data actually has another byte
+                    msb = cls.EXTENDED_FLAG
+                    segment_byte_length = 1
+                    while segment_length >= msb:
+                        low_bits = msb - 1
+                        low = segment_length & low_bits
+                        high = segment_length & ~low_bits
+                        segment_length = (high << 1) + msb + low
+                        segment_byte_length += 1
+                        msb <<= 8
+                    # the byteorder must be little
+                    # that's because we check in case we need a bigger length
+                    # so the least significant byte should appear first
+                    segment_bytes = segment_length.to_bytes(length=segment_byte_length,
+                                                            byteorder='little')
+
+                    continued_difference += struct.pack('>H', start) + segment_bytes + segment
                     segment = bytearray()
                     segment_length = 0
                     start = pos
+                while pos != start + segment_length:
+                    segment += struct.pack('>B', current_scanline[start + segment_length])
+                    segment_length += 1
                 segment += struct.pack('>B', b)
                 segment_length += 1
 
             if len(continued_difference) > len(simple_difference):
-                compression_type = self.__class__.COMPRESSION_SIMPLE
+                compression_type = cls.COMPRESSION_SIMPLE
                 compression_types += compression_type
                 difference = simple_difference
             elif len(current_scanline) > len(continued_difference):
-                compression_type = self.__class__.COMPRESSION_CONTINUED
+                compression_type = cls.COMPRESSION_CONTINUED
                 compression_types += compression_type
                 difference = continued_difference
             else:
-                compression_type = self.__class__.COMPRESSION_REPLACE
+                compression_type = cls.COMPRESSION_REPLACE
                 compression_types += compression_type
                 difference = current_scanline
 
