@@ -142,8 +142,8 @@ class PNG:
                 compression_types += compression_type
                 continue
 
-            simple_difference = b''.join(map(lambda x: struct.pack('>HB', x[0], x[1][0]),
-                                             s_difference))
+            #simple_difference = b''.join(map(lambda x: struct.pack('>HB', x[0], x[1][0]),
+            #                                 s_difference))
             continued_difference = bytearray()
             segment = bytearray()
             segment_length = 0
@@ -182,11 +182,11 @@ class PNG:
                 segment += struct.pack('>B', b)
                 segment_length += 1
 
-            if len(continued_difference) > len(simple_difference):
-                compression_type = cls.COMPRESSION_SIMPLE
-                compression_types += compression_type
-                difference = simple_difference
-            elif len(current_scanline) > len(continued_difference):
+            #if len(continued_difference) > len(simple_difference):
+            #    compression_type = cls.COMPRESSION_SIMPLE
+            #    compression_types += compression_type
+            #    difference = simple_difference
+            if len(current_scanline) > len(continued_difference):
                 compression_type = cls.COMPRESSION_CONTINUED
                 compression_types += compression_type
                 difference = continued_difference

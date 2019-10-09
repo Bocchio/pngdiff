@@ -61,7 +61,7 @@ target_link_libraries(pngdiff_thumbcreator PRIVATE KF5::KIOWidgets)
 
 install(TARGETS pngdiff DESTINATION ${PLUGIN_INSTALL_DIR}/imageformats)
 install(TARGETS pngdiff_thumbcreator DESTINATION ${PLUGIN_INSTALL_DIR})
-install(FILES pngdiffthumbnail.desktop DESTINATION ${SERVICES_INSTALL_DIR})
+install(FILES pngdiffthumbnail.desktop DESTINATION ${KDE_INSTALL_FULL_KSERVICES5DIR})
 install(FILES image-x-pngdiff.xml DESTINATION ${KDE_INSTALL_FULL_MIMEDIR})
 
 # get_cmake_property(_variableNames VARIABLES)
@@ -70,5 +70,17 @@ install(FILES image-x-pngdiff.xml DESTINATION ${KDE_INSTALL_FULL_MIMEDIR})
 #     message(STATUS "${_variableName}=${${_variableName}}")
 # endforeach()
 
+#[[get_cmake_property(_variableNames VARIABLES)
+list (SORT _variableNames)
+foreach (_variableName ${_variableNames})
+    message(STATUS "${_variableName}=${${_variableName}}")
+kde_target_enable_exceptions
+endforeach()]]
+
 install(CODE "execute_process(COMMAND update-desktop-database)")
+
+# There must be a better way but I searched and couldn't find anything
 install(CODE "execute_process(COMMAND update-mime-database /usr/share/mime)")
+
+
+install(CODE "execute_process(COMMAND pypy3 -m pip install . WORKING_DIRECTORY ../pngdiff_utils)")
