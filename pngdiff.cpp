@@ -151,9 +151,9 @@ bool PNGDIFF::process(QByteArray data)
         }
 
         if (!chunkmap.contains(chunk_type)) {
-            qDebug() << chunk_type;
+            qDebug() << chunk_type << length;
             qDebug() << "Unrecognized chunk type";
-            return false;
+            continue;
         }
 
         PNGDIFF::chunk_reader reader = chunkmap[chunk_type];

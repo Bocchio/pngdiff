@@ -83,4 +83,4 @@ install(CODE "execute_process(COMMAND update-desktop-database)")
 install(CODE "execute_process(COMMAND update-mime-database /usr/share/mime)")
 
 
-install(CODE "execute_process(COMMAND pypy3 -m pip install . WORKING_DIRECTORY ../pngdiff_utils)")
+install(CODE "execute_process(COMMAND pypy3 -m pip install ../pngdiff_utils)")

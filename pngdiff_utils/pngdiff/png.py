@@ -3,6 +3,8 @@ import zlib
 import struct
 import logging
 
+import random
+
 def paeth_predictor(a, b, c):
     pa = abs(b - c)
     pb = abs(a - c)
@@ -25,7 +27,11 @@ class PNG:
                          b'IDAT': self.idat_reader}
         self.filter_types = bytearray()
 
+        self.png_data = bytearray()
+
         self.scanline_size = None
+
+        self.path = ''
 
     COMPRESSION_IGNORE = b'\x00'
     COMPRESSION_SIMPLE = b'\x01'
@@ -46,6 +52,10 @@ class PNG:
             if chunk_type == b'IEND':
                 break
 
+            if chunk_type != b'IDAT':
+                self.png_data += length.to_bytes(length=4, byteorder='big')
+                self.png_data += chunk_type + data
+
             if crc != zlib.crc32(chunk_type + data):
                 print(chunk_type)
                 print("CRC failed", crc, crc32(data, crc32(data)))
@@ -61,9 +71,8 @@ class PNG:
                 print("error reading chunk")
 
         self.image_data = zlib.decompress(self.image_data)
-        print('finished decompressing')
         self.reconstruct_png(self.image_data)
-        print('finished reconstructing')
+        print('finished reading', end='')
 
         return True
 
@@ -72,6 +81,7 @@ class PNG:
         with open(filename, 'rb') as f:
             new_image = cls()
             new_image.process(f)
+        new_image.path = filename
         return new_image
 
     def reconstruct_png(self, original):
@@ -85,22 +95,25 @@ class PNG:
 
         for i in range(self.height):
             filter_type = self.image_data[scanlines_and_filter_size * i]
-            # self.filter_types += filter_type
-            for j in range(scanline_size):
-                x = self.image_data[scanlines_and_filter_size * i + j + 1]
+            self.filter_types += filter_type.to_bytes(length=1, byteorder='big')
 
+            row = i*scanline_size
+            row_before = (i-1)*scanline_size
+            x_offset = scanlines_and_filter_size * i
+            for j in range(scanline_size):
+                x = self.image_data[x_offset + j + 1]
+
+                a = 0
+                b = 0
+                c = 0
                 if j >= 4:
-                    a = self.reconstructed[i*scanline_size + j - 4]
-                else:
-                    a = 0
-                if i > 0:
-                    b = self.reconstructed[(i-1)*scanline_size + j]
-                else:
-                    b = 0
-                if i > 0 and j >= 4:
-                    c = self.reconstructed[(i-1)*scanline_size + j-4]
-                else:
-                    c = 0
+                    a = self.reconstructed[row + j - 4]
+                    if i > 0:
+                        b = self.reconstructed[row_before + j]
+                        c = self.reconstructed[row_before + j - 4]
+                elif i > 0:
+                    b = self.reconstructed[row_before + j]
+
 
                 if filter_type == 1:
                     x += a
@@ -120,6 +133,26 @@ class PNG:
         return self.reconstructed[start:end]
 
 
+    def is_similar(self, other, n=2):
+
+        difference_data = bytearray()
+        compression_types = bytearray()
+
+        weight = 0
+        for i in range(n):
+            j = random.randint(0, self.height-1)
+            current_scanline = self.scanline(j)
+            scanlines = zip(current_scanline, other.scanline(j))
+            s_difference = [*filter(lambda b: b[1][0] != b[1][1],
+                                    enumerate(scanlines))]
+            weight += len(s_difference)
+
+        if weight > self.width*n:
+            return False
+
+        return True
+
+
     def difference(self, other):
         difference_data = bytearray()
         compression_types = bytearray()
@@ -131,8 +164,13 @@ class PNG:
             scanlines = zip(current_scanline, other.scanline(s))
 
             # we get the postions in which bytes differ
-            s_difference = [*filter(lambda b: b[1][0] != b[1][1],
-                                    enumerate(scanlines))]
+            # s_difference = [*filter(lambda b: b[1][0] != b[1][1],
+            #                         enumerate(scanlines))]
+            s_difference = []
+            for i, (b1, b2) in enumerate(scanlines):
+                if b1 != b2:
+                    s_difference.append((i, b1))
+
             difference_size = len(s_difference)*3
 
             #if difference_size < self.scanline_size:
@@ -149,7 +187,7 @@ class PNG:
             segment_length = 0
             start = s_difference[0][0]
             last_pos = s_difference[-1][0]
-            for pos, (b, dummy) in s_difference:
+            for pos, b in s_difference:
 
                 # it's cheaper to replace a byte in a segment than to create another
                 # segment altogether
@@ -220,15 +258,19 @@ class PNG:
         self.interlace_method = data[12]
 
         if self.bit_depth != 8:
+            print('Unrecognized bit_depth')
             return False
 
         if self.colour_type != 6:
+            print('Unrecognized colour type')
             return False
 
         if self.compression_method != 0:
+            print('Unrecognized compression method')
             return False
 
         if self.interlace_method != 0:
+            print('Unrecognized interlace method')
             return False
 
         return True

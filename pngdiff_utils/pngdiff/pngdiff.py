@@ -7,6 +7,7 @@ import os
 import zlib
 
 import sys
+import random
 
 SIGNATURE = b'pngdiff'
 
@@ -31,7 +32,6 @@ def write_chunk(f, chunk_type, data, compress=False):
         data = zlib.compress(data, level=9)
 
     length = len(data)
-    print(chunk_type, len(data))
     f.write(length.to_bytes(length=4, byteorder='big'))
     f.write(chunk_type)
     f.write(data)
@@ -44,21 +44,48 @@ def compress(base, targets):
     targets = [*filter(lambda x: x != base, targets)]
     target_images = []
     for filename in targets:
-        target_images.append((filename + 'diff', PNG.from_file(filename)))
+        target_images.append((filename, filename + 'diff'))
 
     path = os.path.join(os.getcwd(), base).encode()
     path_chunk = chunk(chunk_type=b'path', data=path)
     iend_chunk = chunk(chunk_type=b'IEND', data=b'')
-    for filename, image in target_images:
-        with open(filename, 'wb') as f:
-            f.write(SIGNATURE)
-            f.write(path_chunk)
+    for i, (filename, new_filename) in enumerate(target_images):
+        print('\r{} of {} '.format(i + 1, len(target_images)), end='')
+        image = PNG.from_file(filename)
 
-            compression_types, difference_data = image.difference(base_image)
+        if not image.is_similar(base_image):
+            del image
+            continue
 
-            write_chunk(f, b'styp', compression_types, compress=True)
-            write_chunk(f, b'idat', difference_data, compress=True)
-            f.write(iend_chunk)
+        compression_types, difference_data = image.difference(base_image)
+        if len(difference_data)/(1024) > 300:
+            del image
+            continue
+
+        filter_types = image.filter_types
+
+        file_data = SIGNATURE + path_chunk
+        file_data += chunk(b'pdat', image.png_data, compress=True)
+        file_data += chunk(b'ftyp', filter_types, compress=True)
+        file_data += chunk(b'styp', compression_types, compress=True)
+        file_data += chunk(b'idat', difference_data, compress=True)
+        file_data += iend_chunk
+
+        with open(new_filename, 'wb') as f:
+            # f.write(SIGNATURE)
+            # f.write(path_chunk)
+
+            f.write(file_data)
+
+            #write_chunk(f, b'pdat', image.png_data, compress=True)
+            #write_chunk(f, b'ftyp', filter_types, compress=True)
+            #write_chunk(f, b'styp', compression_types, compress=True)
+            #write_chunk(f, b'idat', difference_data, compress=True)
+            #f.write(iend_chunk)
+
+        os.remove(image.path)
+        del image
+    print('')
 
 
 def main():
